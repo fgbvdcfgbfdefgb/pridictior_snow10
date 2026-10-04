@@ -1,0 +1,25 @@
+# Derived data: rebuild with scripts/build_cache.py. ~12 GB for full history.
+data/cache/
+*.f32
+*.u8
+manifest.json
+
+# Training output
+runs/
+models/*.pt
+!models/.gitkeep
+wandb/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+__marimo__/
+
+# OS
+.DS_Store

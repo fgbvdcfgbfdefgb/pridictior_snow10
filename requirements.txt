@@ -1,0 +1,9 @@
+# Core. Everything here is pip-installable, which is the only external
+# dependency Snowflake needs -- no data is fetched at train time.
+numpy>=1.26,<3
+pandas>=2.0
+pyarrow>=14.0
+torch>=2.3
+
+# Live / notebook only. Not needed for offline Snowflake training.
+# Install with:  pip install -r requirements.txt -r requirements-live.txt
