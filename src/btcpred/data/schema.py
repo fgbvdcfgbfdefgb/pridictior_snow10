@@ -44,8 +44,18 @@ SYMBOL: Final[str] = "BTCUSDT"
 PRICE_SCALE: Final[int] = 100  # cents per USDT
 VOLUME_SCALE: Final[int] = 1000  # milli-BTC per BTC
 
-#: Earliest month for which Binance publishes 1s spot klines for BTCUSDT.
-FIRST_MONTH: Final[tuple[int, int]] = (2020, 1)
+#: Default first month for the dataset.
+#:
+#: Binance actually publishes 1s spot klines for BTCUSDT back to 2020-01, and
+#: the downloader will happily fetch them with ``--start 2020-01``. The
+#: default starts at 2022-01 instead: that window spans the 2022 bear market,
+#: the 2023 recovery, the 2024-25 bull run and the current regime, which is
+#: enough regime diversity without the 2020-21 era whose microstructure
+#: (thinner books, different fee tiers, pre-ETF flow) is least like today's.
+FIRST_MONTH: Final[tuple[int, int]] = (2022, 1)
+
+#: Earliest month that exists upstream, for reference and validation.
+EARLIEST_AVAILABLE_MONTH: Final[tuple[int, int]] = (2020, 1)
 
 COLUMNS: Final[dict[str, np.dtype]] = {
     "c": np.dtype(np.int32),

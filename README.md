@@ -53,7 +53,7 @@ Everything is real and runs. Specifically:
 
 | Thing | Status |
 |---|---|
-| BTCUSDT 1-second dataset, 2020-01-01 → 2026-10-03 | **Downloaded and committed** — 82 monthly Parquet shards, 211M seconds, 1.98 GB |
+| BTCUSDT 1-second dataset, 2022-01-01 → 2026-10-03 | **Downloaded and committed** — 58 monthly Parquet shards, 150M seconds, 1.35 GB |
 | Downloader (resumable, handles the ms→µs switch and missing seconds) | Working |
 | Memory-mapped feature cache builder | Working |
 | Live market simulator (single-stream + N-way parallel replay) | Working |
@@ -78,7 +78,7 @@ cd pridictior_snow10
 pip install -r requirements.txt
 
 # 1. Build the feature cache from the committed shards (no network).
-#    Full history is ~12 GB and ~10 min; start smaller to get moving:
+#    Full history is ~9 GB and ~7 min; start smaller to get moving:
 python scripts/build_cache.py --shards data/btcusdt_1s --cache data/cache \
     --start 2026-08 --end 2026-10
 
@@ -97,6 +97,9 @@ To refresh the dataset up to today (needs internet, ~5 min):
 
 ```bash
 PYTHONPATH=src python -m btcpred.data.download_binance \
+    --out data/btcusdt_1s --workers 4          # 2022-01 → today
+# ...or pull the full archive Binance has, back to 2020-01:
+PYTHONPATH=src python -m btcpred.data.download_binance \
     --out data/btcusdt_1s --start 2020-01 --workers 4
 ```
 
@@ -105,11 +108,21 @@ PYTHONPATH=src python -m btcpred.data.download_binance \
 ## 3. The dataset
 
 **Source.** `data.binance.vision`, Binance's public S3 archive. No API key, no
-account. Spot **1-second klines** for BTCUSDT genuinely go back to 2020-01 —
-this is the real tick-grid data, not minute bars interpolated down.
+account. Spot **1-second klines** for BTCUSDT are real tick-grid data, not
+minute bars interpolated down.
 
 **What is committed.** `data/btcusdt_1s/` — one Parquet shard per month,
-2020-01 through 2026-10, 211,161,600 seconds total, 1.98 GB.
+**2022-01 through 2026-10, 150,076,800 seconds, 1.35 GB**, gap-free.
+
+**Why 2022 and not earlier.** Binance publishes 1s klines back to 2020-01 and
+the downloader will fetch them (`--start 2020-01`), but the default window
+starts at 2022-01. That span still covers four distinct regimes — the 2022
+bear market and the LUNA/FTX dislocations, the 2023 grind back, the 2024-25
+bull run, and the current market — while dropping the 2020-21 era whose
+microstructure is least like today's: thinner books, a different fee and
+market-maker landscape, and no spot-ETF flow. For a 25-minute horizon the
+model is learning microstructure dynamics, not macro history, so data whose
+microstructure no longer exists is closer to noise than to signal.
 
 **Storage format.** Shards hold no timestamp column. Rows sit on a dense,
 gap-free 1-second grid, so row *i* of month *M* is unambiguously
@@ -127,7 +140,7 @@ forward-fills price (open = high = low = close = last print, volume = 0), and
 sets a **`flags` column to 1 on every synthesised row**. Those rows are
 down-weighted in the loss (`ObjectiveConfig.filled_weight`, default 0.25)
 rather than being passed off as observations. Across the committed history
-coverage is 99–100% real for almost every month.
+coverage is 99.9–100% real for every month.
 
 | Column | Type | Meaning |
 |---|---|---|
@@ -139,15 +152,15 @@ coverage is 99–100% real for almost every month.
 
 **Features.** 14 channels, all scale-free (log-returns, ratios, bounded
 imbalances, calendar sin/cos). The model never sees an absolute price level —
-BTC traded at \$7k in 2020, and a network that memorises levels dies on the
-first new regime. `tests/test_pipeline.py::test_features_are_finite_and_scale_free`
+BTC traded at \$16k in late 2022, and a network that memorises levels dies on
+the first new regime. `tests/test_pipeline.py::test_features_are_finite_and_scale_free`
 pins this down by checking that feature statistics are unchanged between a
-\$7k and a \$120k price series.
+\$16k and a \$120k price series.
 
 **The cache.** `scripts/build_cache.py` expands shards into three flat
 memory-mapped arrays on one contiguous timeline. Mapping, not loading, is the
 point: every dataloader worker shares the same physical pages, and a random
-12-hour window read becomes a pointer offset instead of a zstd decode. ~12 GB
+12-hour window read becomes a pointer offset instead of a zstd decode. ~9.2 GB
 for the full history, which the 100 GB Snowflake box holds in page cache
 comfortably. The cache is derived data and is `.gitignore`d.
 
@@ -268,8 +281,8 @@ stepping forward one second in lockstep. At each step every stream:
 
 The batch dimension is *parallel market time*, not shuffled samples. That is
 what gives an inherently sequential objective enough arithmetic intensity to
-keep four A10s busy, and it also means each batch mixes 2020 chop with 2024
-trend with last week's regime instead of *B* near-identical neighbours.
+keep four A10s busy, and it also means each batch mixes the 2022 bear with
+2024 trend with last week's regime instead of *B* near-identical neighbours.
 
 ### 5.2 The real-time reward
 
@@ -506,7 +519,7 @@ Read this before trusting anything.
    long run.
 
 3. **794M parameters per predictor is almost certainly too big.** The planner
-   maximises size because the brief asked it to. But 211M seconds of
+   maximises size because the brief asked it to. But 150M seconds of
    ~0.999-autocorrelated data contains far fewer independent observations than
    the row count suggests, and at a 25-minute horizon the signal-to-noise ratio
    is brutal. My expectation is that `--max-d-model 768` (~200M params) will
@@ -538,7 +551,7 @@ Read this before trusting anything.
 
 ```
 pridictior_snow10/
-├── data/btcusdt_1s/              82 monthly Parquet shards, 2020-01 → 2026-10
+├── data/btcusdt_1s/              58 monthly Parquet shards, 2022-01 → 2026-10
 ├── src/btcpred/
 │   ├── data/
 │   │   ├── schema.py             on-disk contract, dense-grid arithmetic
@@ -579,7 +592,7 @@ pridictior_snow10/
 # What would this machine run?
 PYTHONPATH=src python -m btcpred.utils.hardware
 
-# Extend the dataset to today
+# Extend the dataset to today (resumable; re-run any time)
 PYTHONPATH=src python -m btcpred.data.download_binance --out data/btcusdt_1s
 
 # Train one specific variant

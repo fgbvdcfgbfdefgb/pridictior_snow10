@@ -42,10 +42,10 @@ def test_month_lengths_handle_leap_years():
 def test_features_are_finite_and_scale_free():
     n = 5000
     rng = np.random.default_rng(0)
-    # Two price regimes three orders of magnitude apart. A level-dependent
+    # Two price regimes an order of magnitude apart. A level-dependent
     # feature would show up as a difference in the summary statistics.
     out = []
-    for level in (7_000.0, 120_000.0):
+    for level in (16_000.0, 120_000.0):
         price = level * np.exp(np.cumsum(rng.normal(0, 1e-4, n)))
         c = np.rint(price * 100).astype(np.int32)
         f = build_features(

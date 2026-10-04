@@ -2,7 +2,8 @@
 
 Source: ``https://data.binance.vision`` — Binance's public S3 archive. No API
 key, no account, no rate limit worth worrying about. Spot 1s klines for
-BTCUSDT begin at 2020-01.
+BTCUSDT begin at 2020-01; this project defaults to 2022-01 onward (see
+``schema.FIRST_MONTH``), but ``--start 2020-01`` fetches the full archive.
 
 The script is *resumable*: a month whose Parquet shard already exists and
 passes the row-count check is skipped. Interrupt it and re-run it; it picks up
@@ -28,7 +29,7 @@ Usage
 
     python -m btcpred.data.download_binance --out data/btcusdt_1s
     python -m btcpred.data.download_binance --out data/btcusdt_1s \\
-        --start 2025-01 --end 2026-09 --workers 8
+        --start 2020-01 --end 2026-10 --workers 8
 """
 
 from __future__ import annotations
@@ -359,7 +360,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--out", type=Path, default=Path("data/btcusdt_1s"))
     p.add_argument("--start", type=_parse_month, default=FIRST_MONTH,
-                   help="first month, YYYY-MM (default 2020-01)")
+                   help="first month, YYYY-MM (default 2022-01; 2020-01 is the\nearliest Binance publishes)")
     p.add_argument("--end", type=_parse_month, default=None,
                    help="last month, YYYY-MM (default: current month)")
     p.add_argument("--workers", type=int, default=4,
